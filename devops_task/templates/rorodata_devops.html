@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Docker Dashboard</title>
+  <script src="https://unpkg.com/htmx.org@1.9.9"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      display: flex;
+      justify-content: center; 
+    }
+
+    .dashboard-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2rem;              
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section {
+        flex: 1;
+        min-width: 400px;
+        max-width: 600px;
+        text-align: center;
+    }
+
+    .section h2 {
+      margin-bottom: 1rem;
+    }
+
+    .container-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 1rem 0;
+    }
+
+    .refresh-button {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+    }
+
+    .refresh-button:hover {
+      background-color: #f0f0f0;
+    }
+
+    .input-row {
+      margin-bottom: 1rem;
+    }
+
+    .horizontal-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .vl {
+      border-left: 3px solid green;
+      height: 600px;
+    }
+
+    #image-list, #container-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .pill {
+      background: #eee;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+    }
+
+    .pill button {
+      margin-left: 0.5rem;
+      background: none;
+      border: none;
+      color: red;
+      cursor: pointer;
+    }
+    
+    #image-list table,
+    #container-list table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+
+    th, td {
+      padding: 0.5rem;
+      text-align: center;
+    }
+
+    tr:hover {
+      background-color: #f1f1f1;
+      cursor: pointer;
+    }
+
+    .disabled {
+      color: #aaa;
+      pointer-events: none;
+    }
+
+    dialog {
+      border: none;
+      padding: 2rem;
+      border-radius: 10px;
+      width: 500px;
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+<div class="dashboard-container">
+  <div class="section" id="image-section">
+    <h2>Docker Images</h2>
+    <div class="input-row">
+      <input type="text" id="image-input" placeholder="e.g. user/image" />
+      <button 
+        hx-post="/images"
+        hx-trigger="click"
+        hx-target="#image-list"
+        hx-swap="outerHTML"
+        hx-include="#image-input"
+      >
+        Add
+      </button>
+    </div>
+    <div id="image-list" hx-get="/images" hx-trigger="load" hx-swap="outerHTML">
+        <table>
+          <tr><th>Image</th><th>Actions</th></tr>
+          <tr data-image-name="user/image1">
+            <td>user/image1</td>
+            <td>
+              <button 
+                hx-delete="/images/user/image1"
+                hx-target="#image-list"
+                hx-swap="outerHTML"
+                class=""
+              >Delete</button>
+            </td>
+          </tr>
+        </table>
+    </div>
+  </div>
+
+  <div class="vl"></div>
+
+  <div class="section" id="container-section">
+    <h2>Containers</h2>
+    <button  onclick="openDialog()">Run a Container</button>
+    <div class="container-controls">
+      <label>
+        <input type="checkbox" id="show-all-checkbox" onchange="fetchContainers()"> All
+      </label>
+      <button class="refresh-button" onclick="fetchContainers()" title="Refresh">&#x21bb;</button>
+    </div>
+    <div id="container-list" hx-get="/containers" hx-trigger="load" hx-swap="outerHTML">
+      <table>
+        <tr>
+          <th>ID</th>
+          <th>Image</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+  
+        <tr>
+          <td>abc123</td>
+          <td>user/image1</td>
+          <td>running</td>
+          <td>
+            <button 
+              hx-post="/containers/abc123/stop" 
+              hx-target="#container-list" 
+              hx-swap="outerHTML"
+            >
+              Stop
+            </button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>def456</td>
+          <td>user/image2</td>
+          <td>exited</td>
+          <td>
+            <button 
+              hx-delete="/containers/def456" 
+              hx-target="#container-list" 
+              hx-swap="outerHTML"
+            >
+              Remove
+            </button>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+ 
+
+  <dialog id="container-dialog">
+    <form method="dialog" onsubmit="submitContainer(event)">
+      <h3>Create Container</h3>
+
+      <label>Image:</label><br>
+      <input type="text" id="container-image" oninput="updateSuggestions()" autocomplete="off" list="image-suggestions" required>
+      <datalist id="image-suggestions">
+      </datalist>
+      <br><br>
+
+      <label>Expose Port:</label><br>
+      <input type="text" id="port-input" placeholder="e.g. 8080:80" />
+      <button type="button" onclick="addPort()">Expose Port</button>
+      <div class="horizontal-list" id="port-list"></div>
+      <br>
+
+      <label>Command:</label><br>
+      <textarea id="command-input" rows="4" style="width: 100%;"></textarea>
+      <br><br>
+
+      <button type="submit">Run</button>
+      <button type="button" onclick="closeDialog()">Cancel</button>
+    </form>
+  </dialog>
+
+  <script>
+    const portList = [];
+
+    function openDialog() {
+      const dialog = document.getElementById('container-dialog');
+      dialog.showModal();
+      updateSuggestions();
+    }
+
+    function closeDialog() {
+      const dialog = document.getElementById('container-dialog');
+      dialog.close();
+    }
+
+    function addPort() {
+      const portInput = document.getElementById('port-input');
+      const value = portInput.value.trim();
+      if (value && !portList.includes(value)) {
+        portList.push(value);
+        portInput.value = '';
+        renderPortList();
+      }
+    }
+
+    function removePort(port) {
+      const index = portList.indexOf(port);
+      if (index > -1) {
+        portList.splice(index, 1);
+        renderPortList();
+      }
+    }
+
+    function renderPortList() {
+      const listEl = document.getElementById('port-list');
+      listEl.innerHTML = '';
+      portList.forEach(port => {
+        const pill = document.createElement('div');
+        pill.className = 'pill';
+        pill.textContent = port;
+        const btn = document.createElement('button');
+        btn.textContent = '×';
+        btn.onclick = () => removePort(port);
+        pill.appendChild(btn);
+        listEl.appendChild(pill);
+      });
+    }
+
+    function updateSuggestions() {
+      const input = document.getElementById('container-image').value.toLowerCase();
+      fetch('/images')
+        .then(res => res.text())
+        .then(html => {
+          const temp = document.createElement('div');
+          temp.innerHTML = html;
+          const rows = temp.querySelectorAll('tr[data-image-name]');
+          const suggestions = [];
+          rows.forEach(row => {
+            const name = row.getAttribute('data-image-name');
+            if (name.toLowerCase().includes(input)) {
+              suggestions.push(name);
+            }
+          });
+
+          const datalist = document.getElementById('image-suggestions');
+          datalist.innerHTML = '';
+          suggestions.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            datalist.appendChild(opt);
+          });
+        });
+    }
+
+    function submitContainer(event) {
+      event.preventDefault();
+      const image = document.getElementById('container-image').value;
+      const command = document.getElementById('command-input').value;
+      const ports = portList;
+
+      const payload = {
+        image,
+        ports,
+        command
+      };
+
+      fetch('/containers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }).then(res => {
+        if (res.ok) {
+          closeDialog();
+          fetchContainers();
+        }
+      });
+    }
+
+    function fetchContainers(imageFilter = null) {
+      let url = '/containers';
+      const allChecked = document.getElementById('show-all-checkbox').checked;
+      if (imageFilter) {
+        url += `?image=${encodeURIComponent(imageFilter)}`;
+      } else if (allChecked) {
+        url += '?all=true';
+      }
+      document.getElementById('container-list').setAttribute('hx-get', url);
+      htmx.trigger(document.getElementById('container-list'), 'refresh');
+    }
+
+    document.body.addEventListener('click', function (e) {
+      const row = e.target.closest('tr[data-image-name]');
+      if (row) {
+        const imageName = row.getAttribute('data-image-name');
+        fetchContainers(imageName);
+      }
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+      if (evt.target.id === 'container-list') {
+        evt.target.removeAttribute('hx-get');
+      }
+    });
+  </script>
+
+</body>
+</html>

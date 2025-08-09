@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta charset="UTF-8">
+    <title>HTMX + Flask</title>
+    <script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
+    </head>
+    <body>
+        <h1>Welcome to HTMX with Flask</h1>
+    <div id="items">
+        <p>Initial content here...</p>
+    </div>
+    <button hx-get="/more-items" hx-target="#items">Load More</button>
+    </body>
+</html>

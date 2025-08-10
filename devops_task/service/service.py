@@ -76,7 +76,8 @@ def get_container_details(container_id: str):
             "name": container.name,
             "image": container.image.tags[0],
             "ports": ports,
-            "logs": logs
+            "logs": logs,
+            "status": container.status
         }
         return container_details
     except docker.errors.APIError as e:
@@ -87,8 +88,10 @@ def run_container(name:str, image_name: str, commands: Union[str, List[str]], po
     ports = {f"{k}/tcp": v for k, v in ports.items()}
     dc = get_docker_client()
     try:
+        commands = ["/bin/sh", "-c", " && ".join(c for c in commands)]
         dc.containers.run(name= name,image=image_name, command=commands, ports=ports, detach=True)
     except docker.errors.APIError as e:
+         print(e)
          raise ServerError(f"Failed to run a container with image: {image_name}") from e
 
 def stop_container(container_id: str):

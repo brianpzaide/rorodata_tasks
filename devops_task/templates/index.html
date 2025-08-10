@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Docker Dashboard</title>
   <script src="https://unpkg.com/htmx.org@1.9.9"></script>
-  <style>
+ <style>
     body {
       font-family: Arial, sans-serif;
       margin: 2rem;
@@ -122,6 +122,7 @@
     }
 
     dialog {
+      text-align: center;
       border: none;
       padding: 2rem;
       border-radius: 10px;
@@ -134,11 +135,14 @@
   </style>
 </head>
 <body>
+
 <div class="dashboard-container">
+  <!-- IMAGES SECTION -->
   <div class="section" id="image-section">
     <h2>Docker Images</h2>
+
     <div class="input-row">
-      <input type="text" id="image-input" placeholder="e.g. user/image" />
+      <input type="text" id="image-input" name="image_name" placeholder="e.g. user/image" />
       <button 
         hx-post="/images"
         hx-trigger="click"
@@ -149,230 +153,179 @@
         Add
       </button>
     </div>
-    <div id="image-list" hx-get="/images" hx-trigger="load" hx-swap="outerHTML">
-        <table>
-          <tr><th>Image</th><th>Actions</th></tr>
-          <tr data-image-name="user/image1">
-            <td>user/image1</td>
-            <td>
-              <button 
-                hx-delete="/images/user/image1"
-                hx-target="#image-list"
-                hx-swap="outerHTML"
-                class=""
-              >Delete</button>
-            </td>
-          </tr>
-        </table>
-    </div>
+
+    <div id="image-list" hx-get="/images" hx-trigger="load" hx-swap="outerHTML"></div>
   </div>
 
   <div class="vl"></div>
 
+  <!-- CONTAINERS SECTION -->
   <div class="section" id="container-section">
     <h2>Containers</h2>
-    <button  onclick="openDialog()">Run a Container</button>
+    <button onclick="openDialog()">Run a Container</button>
+
     <div class="container-controls">
       <label>
-        <input type="checkbox" id="show-all-checkbox" onchange="fetchContainers()"> All
+        <input type="checkbox" id="show-all-checkbox" name="all"> All
       </label>
-      <button class="refresh-button" onclick="fetchContainers()" title="Refresh">&#x21bb;</button>
+      <button 
+        hx-get="/containers"
+        hx-trigger="click"
+        hx-target="#container-list"
+        hx-swap="outerHTML"
+        hx-include="#show-all-checkbox">⟳</button>
     </div>
-    <div id="container-list" hx-get="/containers" hx-trigger="load" hx-swap="outerHTML">
-      <table>
-        <tr>
-          <th>ID</th>
-          <th>Image</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-  
-        <tr>
-          <td>abc123</td>
-          <td>user/image1</td>
-          <td>running</td>
-          <td>
-            <button 
-              hx-post="/containers/abc123/stop" 
-              hx-target="#container-list" 
-              hx-swap="outerHTML"
-            >
-              Stop
-            </button>
-          </td>
-        </tr>
 
-        <tr>
-          <td>def456</td>
-          <td>user/image2</td>
-          <td>exited</td>
-          <td>
-            <button 
-              hx-delete="/containers/def456" 
-              hx-target="#container-list" 
-              hx-swap="outerHTML"
-            >
-              Remove
-            </button>
-          </td>
-        </tr>
-      </table>
-    </div>
-  </div>
-
+    <div id="container-list" hx-get="/containers" hx-trigger="load,fetch-containers from:body" hx-swap="outerHTML">
 </div>
- 
+  </div>
+</div>
 
-  <dialog id="container-dialog">
-    <form method="dialog" onsubmit="submitContainer(event)">
-      <h3>Create Container</h3>
+<!-- CONTAINER DIALOG -->
+<dialog id="container-dialog">
+  <form method="dialog" onsubmit="submitContainer(event)">
+    <h3>Create Container</h3>
 
-      <label>Image:</label><br>
-      <input type="text" id="container-image" oninput="updateSuggestions()" autocomplete="off" list="image-suggestions" required>
-      <datalist id="image-suggestions">
-      </datalist>
-      <br><br>
+    <label>Image:</label><br>
+    <input type="text" id="container-image" oninput="updateSuggestions()" list="image-suggestions" required><br>
+    <datalist id="image-suggestions"></datalist><br>
 
-      <label>Expose Port:</label><br>
-      <input type="text" id="port-input" placeholder="e.g. 8080:80" />
-      <button type="button" onclick="addPort()">Expose Port</button>
-      <div class="horizontal-list" id="port-list"></div>
-      <br>
+    <label>Container Name:</label><br>
+    <input type="text" id="container-name" required>
+    <datalist id="container-name"></datalist><br><br>
 
-      <label>Command:</label><br>
-      <textarea id="command-input" rows="4" style="width: 100%;"></textarea>
-      <br><br>
+    <label>Expose Port(s):</label><br>
+    <input type="text" id="port-input" placeholder="e.g. 8080:80" />
+    <button type="button" onclick="addPort()">Expose Port</button>
+    <div class="horizontal-list" id="port-list"></div><br>
 
-      <button type="submit">Run</button>
-      <button type="button" onclick="closeDialog()">Cancel</button>
-    </form>
-  </dialog>
+    <label>Command:</label><br>
+    <textarea id="command-input" rows="4" style="width: 100%;"></textarea><br><br>
 
-  <script>
-    const portList = [];
+    <button type="submit">Run</button>
+    <button type="button" onclick="closeDialog()">Cancel</button>
+  </form>
+</dialog>
 
-    function openDialog() {
-      const dialog = document.getElementById('container-dialog');
-      dialog.showModal();
-      updateSuggestions();
+<script>
+  const portList = [];
+
+  function openDialog() {
+    document.getElementById('container-dialog').showModal();
+    updateSuggestions();
+  }
+
+  function closeDialog() {
+    document.getElementById('container-dialog').close();
+  }
+
+  function addPort() {
+    const portInput = document.getElementById('port-input');
+    const value = portInput.value.trim();
+    if (value && !portList.includes(value)) {
+      portList.push(value);
+      portInput.value = '';
+      renderPortList();
     }
+  }
 
-    function closeDialog() {
-      const dialog = document.getElementById('container-dialog');
-      dialog.close();
+  function removePort(port) {
+    const idx = portList.indexOf(port);
+    if (idx !== -1) {
+      portList.splice(idx, 1);
+      renderPortList();
     }
+  }
 
-    function addPort() {
-      const portInput = document.getElementById('port-input');
-      const value = portInput.value.trim();
-      if (value && !portList.includes(value)) {
-        portList.push(value);
-        portInput.value = '';
-        renderPortList();
-      }
-    }
+  function renderPortList() {
+    const list = document.getElementById('port-list');
+    list.innerHTML = '';
+    portList.forEach(port => {
+      const pill = document.createElement('div');
+      pill.className = 'pill';
+      pill.textContent = port;
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '×';
+      closeBtn.onclick = () => removePort(port);
+      pill.appendChild(closeBtn);
+      list.appendChild(pill);
+    });
+  }
 
-    function removePort(port) {
-      const index = portList.indexOf(port);
-      if (index > -1) {
-        portList.splice(index, 1);
-        renderPortList();
-      }
-    }
-
-    function renderPortList() {
-      const listEl = document.getElementById('port-list');
-      listEl.innerHTML = '';
-      portList.forEach(port => {
-        const pill = document.createElement('div');
-        pill.className = 'pill';
-        pill.textContent = port;
-        const btn = document.createElement('button');
-        btn.textContent = '×';
-        btn.onclick = () => removePort(port);
-        pill.appendChild(btn);
-        listEl.appendChild(pill);
-      });
-    }
-
-    function updateSuggestions() {
-      const input = document.getElementById('container-image').value.toLowerCase();
-      fetch('/images')
-        .then(res => res.text())
-        .then(html => {
-          const temp = document.createElement('div');
-          temp.innerHTML = html;
-          const rows = temp.querySelectorAll('tr[data-image-name]');
-          const suggestions = [];
-          rows.forEach(row => {
-            const name = row.getAttribute('data-image-name');
-            if (name.toLowerCase().includes(input)) {
-              suggestions.push(name);
-            }
-          });
-
-          const datalist = document.getElementById('image-suggestions');
-          datalist.innerHTML = '';
-          suggestions.forEach(name => {
+  function updateSuggestions() {
+    const input = document.getElementById('container-image').value.toLowerCase();
+    fetch('/images')
+      .then(res => res.text())
+      .then(html => {
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const rows = temp.querySelectorAll('[data-image-name]');
+        const datalist = document.getElementById('image-suggestions');
+        datalist.innerHTML = '';
+        rows.forEach(row => {
+          const name = row.getAttribute('data-image-name');
+          if (name.toLowerCase().includes(input)) {
             const opt = document.createElement('option');
             opt.value = name;
             datalist.appendChild(opt);
-          });
+          }
         });
-    }
-
-    function submitContainer(event) {
-      event.preventDefault();
-      const image = document.getElementById('container-image').value;
-      const command = document.getElementById('command-input').value;
-      const ports = portList;
-
-      const payload = {
-        image,
-        ports,
-        command
-      };
-
-      fetch('/containers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      }).then(res => {
-        if (res.ok) {
-          closeDialog();
-          fetchContainers();
-        }
       });
-    }
+  }
 
-    function fetchContainers(imageFilter = null) {
-      let url = '/containers';
-      const allChecked = document.getElementById('show-all-checkbox').checked;
-      if (imageFilter) {
-        url += `?image=${encodeURIComponent(imageFilter)}`;
-      } else if (allChecked) {
-        url += '?all=true';
-      }
-      document.getElementById('container-list').setAttribute('hx-get', url);
-      htmx.trigger(document.getElementById('container-list'), 'refresh');
-    }
+  function submitContainer(event) {
+    event.preventDefault();
+    const container_name = document.getElementById('container-name').value;
+    const image = document.getElementById('container-image').value;
+    const commands = document.getElementById('command-input').value.split("\n");
+    const ports = {};
 
-    document.body.addEventListener('click', function (e) {
-      const row = e.target.closest('tr[data-image-name]');
-      if (row) {
-        const imageName = row.getAttribute('data-image-name');
-        fetchContainers(imageName);
+    portList.forEach(p => {
+      const [host, container] = p.split(':');
+      if (host && container) {
+        ports[container] = host;
       }
     });
 
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-      if (evt.target.id === 'container-list') {
-        evt.target.removeAttribute('hx-get');
+    fetch('/containers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: container_name, image_name: image, commands: commands, ports })
+    }).then(res => {
+      if (res.ok) {
+        closeDialog();
+        fetchContainers();
       }
     });
-  </script>
+  }
+
+//   function fetchContainers() {
+//     let url = '/containers';
+//     const all = document.getElementById('show-all-checkbox').checked;
+//     if (all) {
+//       url += '?all=true';
+//     }
+
+//     const el = document.getElementById('container-list');
+//     el.setAttribute('hx-get', url);
+//     htmx.trigger(el, 'refresh');
+//   }
+  
+
+  document.body.addEventListener('click', function (e) {
+    const row = e.target.closest('[data-image-name]');
+    if (row) {
+      const imageName = row.getAttribute('data-image-name');
+      fetchContainers(imageName);
+    }
+  });
+
+  document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.target.id === 'container-list') {
+      evt.target.removeAttribute('hx-get');
+    }
+  });
+</script>
 
 </body>
 </html>

@@ -28,10 +28,9 @@ def delete_image(image_name):
 
 @images_bp.route('/images', methods=['POST'])
 def pull_image():
-    data = request.json.get('image_name') or {}
-    image_name = (data.get('image_name') or "").strip().lower()
+    image_name = request.form.get('image_name') or {}
     try:
-        if (not image_name):
+        if not image_name or image_name.strip() == "":
             return render_template('images/images_list.html', err="client error: image_name must be a valid string")
         else:
             service.pull_image(image_name=image_name)

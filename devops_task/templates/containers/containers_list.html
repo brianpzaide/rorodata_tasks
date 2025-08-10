@@ -1,3 +1,4 @@
+<div id="container-list">
 {% if err %}
   <p style="color: red;">{{ err }}</p>
 {% elif containers %}
@@ -5,7 +6,7 @@
     <tr><th>ID</th><th>Image</th><th>Status</th><th>Actions</th></tr>
     {% for c in containers %}
     <tr>
-      <td>{{ c.id }}</td>
+      <td><a href="{{ url_for('containers.container_detail', container_id=c.id) }}">{{ c.id }}</a></td>
       <td>{{ c.image }}</td>
       <td>{{ c.status }}</td>
       <td>
@@ -29,3 +30,5 @@
 {% else %}
   <p>No containers found.</p>
 {% endif %}
+
+</div>

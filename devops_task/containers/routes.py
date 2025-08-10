@@ -1,5 +1,5 @@
 from service import service
-
+from urllib.parse import unquote
 from flask import Blueprint, render_template, request, jsonify
 
 containers_bp = Blueprint('containers', __name__, template_folder='templates')
@@ -7,13 +7,15 @@ containers_bp = Blueprint('containers', __name__, template_folder='templates')
 @containers_bp.route('/containers', methods=['GET'])
 def list_containers():
     image_name = request.args.get('image_name')
-    all_flag = request.args.get('all', '0') == '1'
+    all_flag = request.args.get('all', '')
+    print(all_flag)
+    all = all_flag == 'true' or all_flag == '1'
     containers = []
     try:
         if (not image_name) or image_name.strip().lower() == "":
             containers = service.list_containers(all=all_flag)
         else:
-            containers = service.list_containers(image_name.strip().lower(), all=all_flag)
+            containers = service.list_containers(image_name.strip().lower(), all=all)
         return render_template('containers/containers_list.html', containers=containers)
     except service.ServerError as e:
         return render_template('containers/containers_list.html', err=e)
@@ -47,7 +49,9 @@ def stop_container(container_id):
 def run_container():
     data = request.get_json()
     try:
-        service.run_container(name=data['name'], image_name=data['image_name'], commands=data['commands'], ports=data['ports'])
+        print(data)
+        service.run_container(name=data['name'], image_name=data['image_name'], commands=[unquote(c) for c in data['commands']], ports=data['ports'])
+        print(data)
     except KeyError:
         return '', 400
     except service.ServerError as e:

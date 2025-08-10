@@ -1,3 +1,31 @@
-{% for item in items %}
-    <p>{{ item }}</p>
-{% endfor %}
+{% if err %}
+  <p style="color: red;">{{ err }}</p>
+{% elif containers %}
+  <table>
+    <tr><th>ID</th><th>Image</th><th>Status</th><th>Actions</th></tr>
+    {% for c in containers %}
+    <tr>
+      <td>{{ c.id }}</td>
+      <td>{{ c.image }}</td>
+      <td>{{ c.status }}</td>
+      <td>
+        {% if c.action == "stop" %}
+        <button 
+          hx-put="/containers/{{ c.id }}"
+          hx-target="#container-list"
+          hx-swap="outerHTML"
+        >Stop</button>
+        {% elif c.action == "remove" %}
+        <button 
+          hx-delete="/containers/{{ c.id }}"
+          hx-target="#container-list"
+          hx-swap="outerHTML"
+        >Remove</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+{% else %}
+  <p>No containers found.</p>
+{% endif %}

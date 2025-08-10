@@ -1,5 +1,8 @@
 import random
 
+from containers import routes as container_routes
+from images import routes as image_routes
+
 from flask import Flask, render_template
 
 app = Flask(__name__)

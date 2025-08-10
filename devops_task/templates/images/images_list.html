@@ -1,3 +1,21 @@
-{% for item in items %}
-    <p>{{ item }}</p>
-{% endfor %}
+{% if err %}
+  <p style="color: red;">{{ err }}</p>
+{% elif images %}
+  <table>
+    <tr><th>Image</th><th>Actions</th></tr>
+    {% for image in images %}
+    <tr data-image-name="{{ image }}">
+      <td>{{ image }}</td>
+      <td>
+        <button 
+          hx-delete="/images/{{ image | urlencode }}"
+          hx-target="#image-list"
+          hx-swap="outerHTML"
+        >Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+{% else %}
+  <p>No images found.</p>
+{% endif %}
